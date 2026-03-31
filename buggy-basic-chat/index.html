@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>PHP Responses Chat</title>
+  <style>
+    body { font-family: system-ui, Arial; max-width: 800px; margin: 24px auto; }
+    #log { border: 1px solid #ddd; padding: 12px; min-height: 240px; white-space: pre-wrap; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
+    input { flex: 1; padding: 8px; }
+    button { padding: 8px 12px; }
+  </style>
+</head>
+<body>
+  <h1>PHP Responses Chat (streaming)</h1>
+
+  <div id="log"></div>
+
+  <div class="row">
+    <input id="msg" placeholder="Type a message..." />
+    <button id="send">Send</button>
+  </div>
+
+  <script>
+    const log = document.getElementById('log');
+    const msg = document.getElementById('msg');
+    const send = document.getElementById('send');
+
+    function append(text) {
+      log.textContent += text;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = msg.value.trim();
+      if (!text) return;
+      msg.value = "";
+
+      append("\n\nYou: " + text + "\nAssistant: ");
+
+      // POST message, then read streamed SSE response
+      const res = await fetch('./chat.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      });
+
+      if (!res.ok || !res.body) {
+        append("\n[Error: " + res.status + "]");
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE frames are separated by blank lines
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop(); // keep unfinished frame
+
+        for (const frame of parts) {
+          // Each frame can have multiple lines like: event: x \n data: y
+          const lines = frame.split("\n");
+          let eventName = "message";
+          let dataLines = [];
+          for (const line of lines) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+          }
+          const data = dataLines.join("\n");
+
+          if (eventName === "token") {
+            append(data);
+          } else if (eventName === "done") {
+            append("\n");
+          } else if (eventName === "error") {
+            append("\n[Error] " + data + "\n");
+          }
+        }
+      }
+    }
+
+    send.addEventListener('click', sendMessage);
+    msg.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>

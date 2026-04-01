@@ -14,6 +14,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from agents import Agent, Runner
+from chatkit.agents import AgentContext, simple_to_agent_input, stream_agent_response
+
 from chatkit.server import ChatKitServer, StreamingResult
 from chatkit.store import NotFoundError, Store
 from chatkit.types import (
@@ -29,6 +32,12 @@ from chatkit.types import (
 )
 
 app = FastAPI()
+
+assistant = Agent(
+    name="assistant",
+    instructions="You are a helpful assistant.",
+    model="gpt-4.1-mini",
+)
 
 
 class MyChatKitStore(Store[dict]):
@@ -126,16 +135,34 @@ class MyChatKitServer(ChatKitServer[dict]):
         input_user_message: UserMessageItem | None,
         context: dict,
     ) -> AsyncIterator[ThreadStreamEvent]:
-        yield ThreadItemDoneEvent(
-            item=AssistantMessageItem(
-                thread_id=thread.id,
-                id=self.store.generate_item_id("message", thread, context),
-                created_at=datetime.now(),
-                content=[AssistantMessageContent(text="Hello, world!")],
-            ),
+        # Streams a fixed "Hello, world!" assistant message
+        # yield ThreadItemDoneEvent(
+        #     item=AssistantMessageItem(
+        #         thread_id=thread.id,
+        #         id=self.store.generate_item_id("message", thread, context),
+        #         created_at=datetime.now(),
+        #         content=[AssistantMessageContent(text="Hello, world!")],
+        #     ),
+        # )
+
+        # Convert recent thread items (which includes the user message) to model input
+        items_page = await self.store.load_thread_items(
+            thread.id,
+            after=None,
+            limit=20,
+            order="asc",
+            context=context,
         )
+        input_items = await simple_to_agent_input(items_page.data)
+
+        # Stream the run through ChatKit events
+        agent_context = AgentContext(thread=thread, store=self.store, request_context=context)
+        result = Runner.run_streamed(assistant, input_items, context=agent_context)
+        async for event in stream_agent_response(agent_context, result):
+            yield event
 
 
+# Create server by passing a store implementation.
 store = MyChatKitStore()
 server = MyChatKitServer(store=store)
 

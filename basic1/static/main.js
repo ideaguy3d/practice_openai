@@ -1,22 +1,5 @@
 (() => {
 
-    function attemp_1() {
-        const chatkit = document.createElement("openai-chatkit");
-
-        chatkit.setOptions({
-            api: {
-                url: "http://localhost:8000/chatkit",
-                domainKey: "local-dev"
-            }
-        });
-
-        chatkit.style.display = "block";
-        chatkit.style.width = "360px";
-        chatkit.style.height = "600px";
-
-        document.getElementById("chat-root").appendChild(chatkit);
-    }
-
     const dom = {
         chatkitHost: document.getElementById("chatkit-host"),
     };

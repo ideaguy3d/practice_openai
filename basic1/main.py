@@ -31,6 +31,9 @@ from chatkit.types import (
     UserMessageItem,
 )
 
+from multi_agent_practice import triage_agent
+
+
 app = FastAPI()
 
 assistant = Agent(
@@ -135,17 +138,7 @@ class MyChatKitServer(ChatKitServer[dict]):
         input_user_message: UserMessageItem | None,
         context: dict,
     ) -> AsyncIterator[ThreadStreamEvent]:
-        # Streams a fixed "Hello, world!" assistant message
-        # yield ThreadItemDoneEvent(
-        #     item=AssistantMessageItem(
-        #         thread_id=thread.id,
-        #         id=self.store.generate_item_id("message", thread, context),
-        #         created_at=datetime.now(),
-        #         content=[AssistantMessageContent(text="Hello, world!")],
-        #     ),
-        # )
-
-        # Convert recent thread items (which includes the user message) to model input
+       # Convert recent thread items (which includes the user message) to model input
         items_page = await self.store.load_thread_items(
             thread.id,
             after=None,
@@ -157,7 +150,7 @@ class MyChatKitServer(ChatKitServer[dict]):
 
         # Stream the run through ChatKit events
         agent_context = AgentContext(thread=thread, store=self.store, request_context=context)
-        result = Runner.run_streamed(assistant, input_items, context=agent_context)
+        result = Runner.run_streamed(triage_agent, input_items, context=agent_context)
         async for event in stream_agent_response(agent_context, result):
             yield event
 

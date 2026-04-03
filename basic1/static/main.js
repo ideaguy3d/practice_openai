@@ -17,22 +17,7 @@
         console.log('POST: waitForElementDefinition()');
     }
 
-    async function initChatKit() {
-        if (!window.customElements) {
-            setStatus("Browser does not support custom elements");
-            return;
-        }
-
-        try {
-            await waitForElementDefinition("openai-chatkit", 10000);
-        }
-        catch (error) {
-            console.error("ChatKit custom element failed to define", error);
-            return;
-        }
-
-        chatkitElement = document.createElement("openai-chatkit");
-
+    function add_event_listeners(chatkitElement) {
         chatkitElement.addEventListener("chatkit.ready", () => {
             console.log('ChatKit ready event');
         });
@@ -55,6 +40,23 @@
         chatkitElement.addEventListener("chatkit.error", (event) => {
             console.error("ChatKit error", event.detail?.error || event.detail);
         });
+    }
+
+    async function initChatKit() {
+        if (!window.customElements) {
+            setStatus("Browser does not support custom elements");
+            return;
+        }
+
+        try {
+            await waitForElementDefinition("openai-chatkit", 10000);
+        }
+        catch (error) {
+            console.error("ChatKit custom element failed to define", error);
+            return;
+        }
+
+        chatkitElement = document.createElement("openai-chatkit");
 
         dom.chatkitHost.appendChild(chatkitElement);
 
@@ -68,10 +70,12 @@
         dom.chatkitHost.style.display = "block";
         dom.chatkitHost.style.width = "360px";
         dom.chatkitHost.style.height = "600px";
+        add_event_listeners(chatkitElement);
     }
 
     async function start() {
         await initChatKit();
+
     }
 
     void start();

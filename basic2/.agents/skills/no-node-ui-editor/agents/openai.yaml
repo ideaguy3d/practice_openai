@@ -1,0 +1,4 @@
+interface:
+  display_name: "No-Node UI Editor"
+  short_description: "Static UI edits with Context7, search, and apply_patch"
+  default_prompt: "Use $no-node-ui-editor to implement a static UI change with Context7 lookup, one web verification, apply_patch edits, and shell-only verification."

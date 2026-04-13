@@ -33,18 +33,3 @@ triage_agent = Agent(
     handoffs=[history_tutor_agent, math_tutor_agent],
     model="gpt-4.1-mini"
 )
-
-
-async def main():
-    s = "\n\n----\n\n"
-    print(s)
-    inputs = [
-        "Tell me something surprising about ancient life on Earth.",
-        "Who was the first president of the United States?",
-        "Can you show me a simple example of a statistical hypothesis test?"
-    ]
-    result1 = await Runner.run(history_tutor_agent, inputs[0])
-    print(result1.final_output, s)
-
-    result2 = await Runner.run(starting_agent=triage_agent, input=inputs[2])
-    print(result2.final_output, f"Answered by: {result2.last_agent.name}")

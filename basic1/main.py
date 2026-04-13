@@ -138,7 +138,8 @@ class MyChatKitServer(ChatKitServer[dict]):
         input_user_message: UserMessageItem | None,
         context: dict,
     ) -> AsyncIterator[ThreadStreamEvent]:
-       # Convert recent thread items (which includes the user message) to model input
+        
+        # Convert recent thread items (which includes the user message) to model input
         items_page = await self.store.load_thread_items(
             thread.id,
             after=None,

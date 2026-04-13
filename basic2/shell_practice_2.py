@@ -25,9 +25,12 @@ async def require_approval(commands: Sequence[str]) -> None:
         return
 
     print("Shell command approval required:")
+    
     for entry in commands:
         print(" ", entry)
+    
     response = input("Proceed? [y/N] ").strip().lower()
+    
     if response not in {"y", "yes"}:
         raise RuntimeError("Shell command execution rejected by user.")
 
@@ -175,7 +178,7 @@ async def run_coding_agent_with_logs(user_prompt: str) -> None:
             mcp_servers=[context7_server],
         )
 
-        result = Runner.run_streamed(coding_agent, input=user_prompt)
+        result = Runner.run_streamed(starting_agent=coding_agent, input=user_prompt)
         async for event in result.stream_events():
             if event.type != "run_item_stream_event":
                 continue

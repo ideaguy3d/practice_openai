@@ -4,8 +4,7 @@
         chatkitHost: document.getElementById("chatkit-host"),
     };
 
-    async function waitForElementDefinition(elementName, timeoutMs) {
-        console.log('PRE: in waitForElementDefinition()');
+    async function wait_for_element_def(elementName, timeoutMs) {
         await Promise.race([
             customElements.whenDefined(elementName),
             new Promise((_, reject) => {
@@ -14,7 +13,6 @@
                 }, timeoutMs);
             }),
         ]);
-        console.log('POST: waitForElementDefinition()');
     }
 
     function add_event_listeners(chatkitElement) {
@@ -42,17 +40,17 @@
         });
     }
 
-    async function initChatKit() {
+    async function init_chatkit() {
         if (!window.customElements) {
-            setStatus("Browser does not support custom elements");
+            console.error("Browser does not support custom elements");
             return;
         }
 
         try {
-            await waitForElementDefinition("openai-chatkit", 10000);
+            await wait_for_element_def("openai-chatkit", 10000);
         }
         catch (error) {
-            console.error("ChatKit custom element failed to define", error);
+            console.error("ChatKit element failed.", error);
             return;
         }
 
@@ -74,7 +72,7 @@
     }
 
     async function start() {
-        await initChatKit();
+        await init_chatkit();
     }
 
     void start();

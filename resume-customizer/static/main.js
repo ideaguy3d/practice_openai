@@ -2,6 +2,13 @@
 
     const dom = {
         chatkitHost: document.getElementById("chatkit-host"),
+        resume2Panel: document.getElementById("resume-2-panel"),
+        resume2Frame: document.getElementById("resume-2-frame"),
+        resume2Status: document.getElementById("resume-2-status"),
+    };
+
+    const state = {
+        hasShownCustomizedResume: false,
     };
 
     async function wait_for_element_def(elementName, timeoutMs) {
@@ -13,6 +20,55 @@
                 }, timeoutMs);
             }),
         ]);
+    }
+
+    function show_customized_resume(reason = "update") {
+        if (!dom.resume2Panel || !dom.resume2Frame) {
+            return;
+        }
+
+        if (!state.hasShownCustomizedResume) {
+            dom.resume2Panel.classList.remove("is-hidden");
+            state.hasShownCustomizedResume = true;
+        }
+
+        dom.resume2Frame.src = `/Resume_2.html?t=${Date.now()}`;
+        if (dom.resume2Status) {
+            dom.resume2Status.textContent = `Loaded after ${reason}.`;
+        }
+    }
+
+    function effect_requests_resume_render(detail) {
+        if (!detail) {
+            return false;
+        }
+
+        const effectName =
+            detail.effect ??
+            detail.name ??
+            detail.type ??
+            detail.action ??
+            detail.event ??
+            null;
+
+        if (typeof effectName === "string") {
+            const normalized = effectName.toLowerCase();
+            if (
+                normalized.includes("render_resume_2") ||
+                normalized.includes("show_resume_2") ||
+                normalized.includes("resume_customized") ||
+                normalized.includes("resume_updated")
+            ) {
+                return true;
+            }
+        }
+
+        return Boolean(
+            detail.render_resume_2 ||
+            detail.show_resume_2 ||
+            detail.resume_customized ||
+            detail.resume_updated
+        );
     }
 
     function add_event_listeners(chatkitElement) {
@@ -28,11 +84,15 @@
 
         chatkitElement.addEventListener("chatkit.response.end", () => {
             console.log('ChatKit response end event')
+            show_customized_resume("assistant response");
         });
 
         chatkitElement.addEventListener("chatkit.effect", (event) => {
             console.log('ChatKit effect event')
             console.log(event.detail);
+            if (effect_requests_resume_render(event.detail)) {
+                show_customized_resume("chatkit effect");
+            }
         });
 
         chatkitElement.addEventListener("chatkit.error", (event) => {
@@ -66,9 +126,14 @@
         });
 
         dom.chatkitHost.style.display = "block";
-        dom.chatkitHost.style.width = "360px";
-        dom.chatkitHost.style.height = "600px";
+        dom.chatkitHost.style.width = "100%";
+        dom.chatkitHost.style.height = "100%";
         add_event_listeners(chatkitElement);
+
+        // Allows explicit function-call style triggers from future integrations.
+        window.resumeCustomizerUI = {
+            showCustomizedResume: () => show_customized_resume("manual function call"),
+        };
     }
 
     async function start() {

@@ -1,23 +1,135 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>resume customizer</title>
-
+  <title>Resume Customizer</title>
   <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"></script>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --border: #d5dae1;
+      --text: #1d2939;
+      --muted: #475467;
+    }
 
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr 390px;
+      gap: 14px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      min-height: calc(100vh - 32px);
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .card-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 600;
+      background: #f8fafc;
+    }
+
+    .card-note {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+
+    iframe {
+      border: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      background: #fff;
+      flex: 1;
+    }
+
+    #resume-2-panel.is-hidden {
+      display: none;
+    }
+
+    .chat-panel {
+      min-height: calc(100vh - 32px);
+    }
+
+    #chatkit-host {
+      width: 100%;
+      height: 100%;
+      min-height: 620px;
+    }
+
+    @media (max-width: 1200px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 960px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+      .workspace,
+      .chat-panel {
+        min-height: auto;
+      }
+      #chatkit-host {
+        min-height: 520px;
+      }
+    }
+  </style>
 </head>
-
 <body>
+  <main class="page">
+    <section class="workspace">
+      <article class="card">
+        <header class="card-header">Resume 1 (Original)</header>
+        <iframe src="/Resume_1.html" title="Original Resume"></iframe>
+      </article>
 
-  <h1>My AI Chat 1</h1>
-  
-  <div id="chatkit-host"></div>
+      <article class="card is-hidden" id="resume-2-panel">
+        <header class="card-header">
+          Resume 2 (Customized)
+          <span class="card-note" id="resume-2-status">Will appear after job description is submitted.</span>
+        </header>
+        <iframe id="resume-2-frame" src="/Resume_2.html" title="Customized Resume"></iframe>
+      </article>
+    </section>
 
+    <aside class="card chat-panel">
+      <header class="card-header">ChatKit (Paste Job Description Here)</header>
+      <div id="chatkit-host"></div>
+    </aside>
+  </main>
   <script src="main.js" defer></script>
 </body>
-
 </html>

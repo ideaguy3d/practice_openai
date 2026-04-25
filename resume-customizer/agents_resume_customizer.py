@@ -1,78 +1,152 @@
 """
-Resume-customizer agents.
-
-Focused on two capabilities:
-- extracting target-job skills and transferable skills
-- rewriting experience bullets for a target job without fabrication
+Resume-customizer agents and helper routines.
 """
 
-from agents import Agent
+from __future__ import annotations
+
+from pathlib import Path
+import json
+
+from pydantic import BaseModel, Field
+from agents import Agent, Runner
+
+_RESUME_CONTENT_PATH = Path(__file__).resolve().parent / "static" / "resume-content.json"
+
+
+class JobDescriptionDecision(BaseModel):
+    is_job_description: bool
+    confidence: float = Field(ge=0, le=1)
+    reason: str
+
+
+class ResumeContentUpdates(BaseModel):
+    updates: dict[str, str]
+    notes: str = ""
+
+
+jd_detector_agent = Agent(
+    name="Job Description Detector",
+    instructions="""
+Classify whether the user's latest message is a job description to tailor a resume to.
+
+Return:
+- is_job_description: true only when the message is clearly a job description or posting
+- confidence: 0..1
+- reason: one short sentence
+""",
+    output_type=JobDescriptionDecision,
+    model="gpt-5.1-mini",
+)
+
+
+resume_customizer_agent = Agent(
+    name="Resume Content Customizer",
+    instructions="""
+You customize resume content fields for a target job description.
+
+Hard rules:
+- Use ONLY keys from the `Allowed keys` list supplied in the input.
+- Do not invent experience, metrics, tools, dates, or scope not implied by provided resume content.
+- Keep strong alignment with JD language while remaining truthful.
+- Return only fields that should change as `updates`.
+
+Style constraints:
+- summary-text: 1-3 concise sentences.
+- skill-1..skill-12: short skill phrases.
+- *-title fields: short role title.
+- *-dates fields: company + dates formatting, concise and truthful.
+- *-bullet-* fields: concise impact bullets.
+""",
+    output_type=ResumeContentUpdates,
+    model="gpt-5.1",
+)
 
 
 job_skills_agent = Agent(
     name="Job Skills Agent",
     handoff_description="Extracts required job skills and maps transferable skills from a resume/profile.",
     instructions="""
-You are a resume/job skill extraction specialist.
-
-Goal:
-- Given a job description and (optionally) user background text, extract the most important
-  required skills and identify transferable skills the user likely has.
-
-Output format:
-1. Required Skills (8-15 bullets)
-2. Transferable Skills Match (bullets: Required Skill -> Evidence from user input)
-3. Gaps To Address (bullets)
-4. Priority Focus For Resume (top 3-5 items)
-
-Rules:
-- Use only information provided in the conversation.
-- If user background is missing, ask for it before mapping transferable skills.
-- Be specific and concise.
+Extract top required skills from the job description and map them to likely transferable skills.
+Keep the response concise and actionable.
 """,
+    model="gpt-5.1-mini",
 )
 
 
 job_experience_agent = Agent(
     name="Job Experience Rewrite Agent",
-    handoff_description=(
-        "Rewrites resume experience bullets to align with target role requirements."
-    ),
+    handoff_description="Rewrites resume bullets while preserving truthfulness.",
     instructions="""
-You are a resume bullet rewriting specialist.
-
-Goal:
-- Rewrite or improve experience bullets so they align to the target role and remain truthful.
-
-Output format:
-1. Rewritten Bullets (grouped by role/company if provided)
-2. Optional Alternate Bullets (when useful)
-3. Notes (missing metrics or details user should add)
-
-Rules:
-- Do not fabricate achievements, numbers, tools, or scope.
-- Preserve the user's actual experience and intent.
-- Prefer concise, impact-oriented bullets.
-- If source bullets are missing, ask user to provide them.
+Rewrite requested bullets for stronger relevance to a target role.
+Do not fabricate achievements, metrics, tools, or scope.
 """,
+    model="gpt-5.1",
 )
 
 
 router_agent = Agent(
     name="Resume Customizer Router Agent",
     instructions="""
-You are the router for the resume-customizer app.
+You are the conversational assistant for the resume customizer.
 
-Routing policy:
-- Handoff to Job Skills Agent for job-description parsing, required skills extraction,
-  transferable skills mapping, or resume targeting strategy.
-- Handoff to Job Experience Rewrite Agent for rewriting resume bullets, role summaries,
-  and alignment to target job requirements.
-
-If inputs are incomplete:
-- Ask only for the minimum required missing info (job description, current resume text,
-  or specific bullets to rewrite).
+If a job description was provided, confirm that resume customization ran and summarize what was optimized.
+If not enough info is provided, ask only for missing essentials.
 """,
     handoffs=[job_skills_agent, job_experience_agent],
     model="gpt-5.1",
 )
+
+
+def load_resume_template_data() -> tuple[list[str], dict[str, str]]:
+    payload = json.loads(_RESUME_CONTENT_PATH.read_text(encoding="utf-8"))
+    content = payload.get("content", {})
+    target_ids = payload.get("target_ids")
+    if not target_ids:
+        target_ids = list(content.keys())
+    return target_ids, content
+
+
+async def detect_job_description(text: str) -> JobDescriptionDecision:
+    result = await Runner.run(starting_agent=jd_detector_agent, input=text)
+    return result.final_output_as(JobDescriptionDecision, raise_if_incorrect_type=True)
+
+
+def _sanitize_updates(base_content: dict[str, str], updates: dict[str, str], allowed_ids: list[str]) -> dict[str, str]:
+    allowed = set(allowed_ids)
+    merged = dict(base_content)
+    for key, value in updates.items():
+        if key not in allowed:
+            continue
+        cleaned = " ".join(str(value).split()).strip()
+        if not cleaned:
+            continue
+        # Keep fields bounded so rendering remains stable.
+        if key == "summary-text":
+            merged[key] = cleaned[:550]
+        elif key.endswith("-title"):
+            merged[key] = cleaned[:90]
+        elif key.endswith("-dates"):
+            merged[key] = cleaned[:100]
+        elif "-bullet-" in key:
+            merged[key] = cleaned[:420]
+        elif key.startswith("skill-"):
+            merged[key] = cleaned[:80]
+        else:
+            merged[key] = cleaned[:420]
+    return merged
+
+
+async def generate_custom_resume_content(job_description: str) -> dict[str, str]:
+    target_ids, base_content = load_resume_template_data()
+    customization_input = (
+        "Job description:\n"
+        f"{job_description}\n\n"
+        "Current resume content JSON (editable fields only):\n"
+        f"{json.dumps(base_content, ensure_ascii=True, indent=2)}\n\n"
+        f"Allowed keys: {target_ids}\n"
+    )
+    result = await Runner.run(starting_agent=resume_customizer_agent, input=customization_input)
+    output = result.final_output_as(ResumeContentUpdates, raise_if_incorrect_type=True)
+    return _sanitize_updates(
+        base_content=base_content, updates=output.updates, allowed_ids=target_ids
+    )

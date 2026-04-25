@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI (resume-customizer)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "cwd": "${workspaceFolder}/resume-customizer",
+      "justMyCode": false,
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/resume-customizer/.env"
+    }
+  ]
+}

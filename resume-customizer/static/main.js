@@ -9,6 +9,7 @@
 
     const state = {
         hasShownCustomizedResume: false,
+        currentThreadId: null,
     };
 
     async function wait_for_element_def(elementName, timeoutMs) {
@@ -22,8 +23,8 @@
         ]);
     }
 
-    function show_customized_resume(reason = "update") {
-        if (!dom.resume2Panel || !dom.resume2Frame) {
+    function show_customized_resume(reason = "update", threadId = null) {
+        if (!dom.resume2Panel || !dom.resume2Frame || !threadId) {
             return;
         }
 
@@ -32,7 +33,8 @@
             state.hasShownCustomizedResume = true;
         }
 
-        dom.resume2Frame.src = `/Resume_2.html?t=${Date.now()}`;
+        const encodedThread = encodeURIComponent(threadId);
+        dom.resume2Frame.src = `/custom_resume.html?thread=${encodedThread}&t=${Date.now()}`;
         if (dom.resume2Status) {
             dom.resume2Status.textContent = `Loaded after ${reason}.`;
         }
@@ -71,6 +73,38 @@
         );
     }
 
+    async function custom_resume_exists(threadId) {
+        if (!threadId) {
+            return false;
+        }
+        try {
+            const response = await fetch(
+                `/api/custom-resume/${encodeURIComponent(threadId)}/exists`, {
+                method: "GET",
+                cache: "no-store",
+            });
+            if (!response.ok) {
+                return false;
+            }
+            const body = await response.json();
+            return Boolean(body.exists);
+        } catch (error) {
+            console.error("Failed checking custom resume status", error);
+            return false;
+        }
+    }
+
+    async function maybe_show_custom_resume(reason) {
+        const threadId = state.currentThreadId;
+        if (!threadId) {
+            return;
+        }
+        const exists = await custom_resume_exists(threadId);
+        if (exists) {
+            show_customized_resume(reason, threadId);
+        }
+    }
+
     function add_event_listeners(chatkitElement) {
         chatkitElement.addEventListener("chatkit.ready", () => {
             console.log('ChatKit ready event');
@@ -78,20 +112,22 @@
 
         chatkitElement.addEventListener("chatkit.thread.change", (event) => {
             const threadId = event.detail?.threadId ?? null;
+            state.currentThreadId = threadId;
             console.log('ChatKit thread change event');
             console.log(threadId);
+            void maybe_show_custom_resume("thread change");
         });
 
         chatkitElement.addEventListener("chatkit.response.end", () => {
             console.log('ChatKit response end event')
-            show_customized_resume("assistant response");
+            void maybe_show_custom_resume("assistant response");
         });
 
         chatkitElement.addEventListener("chatkit.effect", (event) => {
             console.log('ChatKit effect event')
             console.log(event.detail);
             if (effect_requests_resume_render(event.detail)) {
-                show_customized_resume("chatkit effect");
+                void maybe_show_custom_resume("chatkit effect");
             }
         });
 
@@ -132,7 +168,9 @@
 
         // Allows explicit function-call style triggers from future integrations.
         window.resumeCustomizerUI = {
-            showCustomizedResume: () => show_customized_resume("manual function call"),
+            showCustomizedResume: () => {
+                void maybe_show_custom_resume("manual function call");
+            },
         };
     }
 

@@ -19,14 +19,19 @@ from chatkit.types import ThreadMetadata, ThreadStreamEvent, UserMessageItem
 
 from chatkit_store import ResumeCustomizerChatKitStore
 from agents_resume_customizer import (
-    detect_job_description,
-    generate_custom_resume_content,
     load_resume_template_data,
     router_agent,
 )
 
+should_log = True
+
 app = FastAPI() 
 CUSTOM_RESUME_BY_THREAD: dict[str, dict] = {}
+
+
+def log(msg):
+    s = "\n\n--\n\n"
+    open("app.log", "a").write(s + msg + s)
 
 
 def _extract_user_text(message: UserMessageItem | None) -> str:
@@ -42,27 +47,11 @@ def _extract_user_text(message: UserMessageItem | None) -> str:
 
 
 class ResumeCustomizerChatkitServer(ChatKitServer[dict]):
-    
     async def respond(self, thread: ThreadMetadata, input_user_message: UserMessageItem | None, context: dict) -> AsyncIterator[ThreadStreamEvent]:
         user_text = _extract_user_text(input_user_message)
-        if user_text:
-            try:
-                target_ids, _ = load_resume_template_data()
-                jd_decision = await detect_job_description(user_text)
-                likely_jd_by_shape = len(user_text) >= 450
-                should_customize = jd_decision.is_job_description and jd_decision.confidence >= 0.50
-                if should_customize or likely_jd_by_shape:
-                    custom_content = await generate_custom_resume_content(user_text)
-                    CUSTOM_RESUME_BY_THREAD[thread.id] = {
-                        "target_ids": target_ids,
-                        "content": custom_content,
-                    }
-                    context["resume_customized"] = True
-                    context["resume_customized_thread_id"] = thread.id
-            except Exception as exc:
-                # Non-fatal: conversation should still continue if customization fails.
-                print(f"Customization pipeline error for thread {thread.id}: {exc}")
-        
+        # target_ids, content = load_resume_template_data()
+        # likely_jd_by_shape = len(user_text) >= 450
+     
         # Load the latest N items, then reorder to chronological for model input.
         # This avoids dropping recent context once thread length exceeds N.
         items = await self.store.load_thread_items(

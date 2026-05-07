@@ -34,24 +34,8 @@ def log(msg):
     open("app.log", "a").write(s + msg + s)
 
 
-def _extract_user_text(message: UserMessageItem | None) -> str:
-    if message is None:
-        return ""
-    parts: list[str] = []
-    for part in message.content:
-        if getattr(part, "type", None) == "input_text":
-            text = (getattr(part, "text", "") or "").strip()
-            if text:
-                parts.append(text)
-    return "\n".join(parts).strip()
-
-
 class ResumeCustomizerChatkitServer(ChatKitServer[dict]):
     async def respond(self, thread: ThreadMetadata, input_user_message: UserMessageItem | None, context: dict) -> AsyncIterator[ThreadStreamEvent]:
-        user_text = _extract_user_text(input_user_message)
-        # target_ids, content = load_resume_template_data()
-        # likely_jd_by_shape = len(user_text) >= 450
-     
         # Load the latest N items, then reorder to chronological for model input.
         # This avoids dropping recent context once thread length exceeds N.
         items = await self.store.load_thread_items(
@@ -94,12 +78,6 @@ async def get_custom_resume(thread_id: str):
 async def custom_resume_exists(thread_id: str):
     thread_exists = thread_id in CUSTOM_RESUME_BY_THREAD
     return JSONResponse(content={"exists": thread_exists})
-
-
-@app.get("/api/base-resume")
-async def get_base_resume():
-    target_ids, content = load_resume_template_data()
-    return JSONResponse(content={"target_ids": target_ids, "content": content})
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

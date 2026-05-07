@@ -32,7 +32,6 @@ def load_resume_template_data() -> tuple[list[str], dict[str, str]]:
     return target_ids, content
 
 
-
 def _sanitize_updates(base_content: dict[str, str], updates: dict[str, str], allowed_ids: list[str]) -> dict[str, str]:
     allowed = set(allowed_ids)
     merged = dict(base_content)
@@ -58,7 +57,6 @@ def _sanitize_updates(base_content: dict[str, str], updates: dict[str, str], all
     return merged
 
 
-
 jd_detector_agent = Agent(
     name="Job Description Detector",
     instructions="""
@@ -81,7 +79,7 @@ You customize resume content fields for a target job description.
 Use load_resume_template_data to get users resume.
 
 Hard rules:
-- Use ONLY keys from the `Allowed keys` list supplied in the input.
+- Use ONLY keys from the 'content' node.
 - Do not invent experience, metrics, tools, dates, or scope not implied by provided resume content.
 - Keep strong alignment with JD language while remaining truthful.
 - Return only fields that should change as `updates`.

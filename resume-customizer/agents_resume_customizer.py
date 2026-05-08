@@ -59,6 +59,7 @@ def _sanitize_updates(base_content: dict[str, str], updates: dict[str, str], all
 
 jd_detector_agent = Agent(
     name="Job Description Detector",
+    handoff_description="Classify whether the user's latest message is a job description",
     instructions="""
 Classify whether the user's latest message is a job description to tailor a resume to.
 
@@ -74,6 +75,7 @@ Return:
 
 resume_customizer_agent = Agent(
     name="Resume Content Customizer",
+    handoff_description="Get the resume content from the file on disk",
     instructions="""
 You customize resume content fields for a target job description.
 Use load_resume_template_data to get users resume.

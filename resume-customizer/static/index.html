@@ -84,8 +84,63 @@
 
     #chatkit-host {
       width: 100%;
-      height: 100%;
-      min-height: 620px;
+      height: 40%;
+      min-height: 260px;
+    }
+
+    #chatkit-host.is-hidden {
+      display: none;
+    }
+
+    .fallback-chat {
+      border-bottom: 1px solid var(--border);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .fallback-chat textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font: inherit;
+      color: var(--text);
+      background: #fff;
+    }
+
+    .fallback-chat textarea:focus {
+      outline: 2px solid #84c5ff;
+      outline-offset: 1px;
+    }
+
+    .fallback-chat-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .fallback-chat button {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font: inherit;
+      font-weight: 600;
+      color: #fff;
+      background: #175cd3;
+      cursor: pointer;
+    }
+
+    .fallback-chat button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+    }
+
+    .fallback-chat-status {
+      color: var(--muted);
+      font-size: 12px;
     }
 
     @media (max-width: 1200px) {
@@ -127,6 +182,13 @@
 
     <aside class="card chat-panel">
       <header class="card-header">ChatKit (Paste Job Description Here)</header>
+      <form class="fallback-chat" id="fallback-chat-form">
+        <textarea id="job-description-input" placeholder="Paste a job description here"></textarea>
+        <div class="fallback-chat-actions">
+          <button type="submit" id="customize-resume-button">Customize Resume</button>
+          <span class="fallback-chat-status" id="fallback-chat-status">Ready.</span>
+        </div>
+      </form>
       <div id="chatkit-host"></div>
     </aside>
   </main>

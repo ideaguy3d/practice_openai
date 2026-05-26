@@ -28,6 +28,31 @@ class ResumeContentUpdates(BaseModel):
     notes: str = ""
 
 
+def _sanitize_updates(base_content: dict[str, str], updates: dict[str, str], allowed_ids: list[str]) -> dict[str, str]:
+    allowed = set(allowed_ids)
+    merged = dict(base_content)
+    for key, value in updates.items():
+        if key not in allowed:
+            continue
+        cleaned = " ".join(str(value).split()).strip()
+        if not cleaned:
+            continue
+        # Keep fields bounded so rendering remains stable.
+        if key == "summary-text":
+            merged[key] = cleaned[:550]
+        elif key.endswith("-title"):
+            merged[key] = cleaned[:90]
+        elif key.endswith("-dates"):
+            merged[key] = cleaned[:100]
+        elif "-bullet-" in key:
+            merged[key] = cleaned[:420]
+        elif key.startswith("skill-"):
+            merged[key] = cleaned[:80]
+        else:
+            merged[key] = cleaned[:420]
+    return merged
+
+
 def _load_resume_template_data() -> tuple[list[str], dict[str, str]]:
     payload = json.loads(_RESUME_CONTENT_PATH.read_text(encoding="utf-8"))
     content = payload.get("content", {})
@@ -80,36 +105,11 @@ def save_custom_resume(ctx: RunContextWrapper[object], updates: dict[str, str]) 
     return {"saved": True, "thread_id": thread_id, "updated_fields": len(updates)}
 
 
-def _sanitize_updates(base_content: dict[str, str], updates: dict[str, str], allowed_ids: list[str]) -> dict[str, str]:
-    allowed = set(allowed_ids)
-    merged = dict(base_content)
-    for key, value in updates.items():
-        if key not in allowed:
-            continue
-        cleaned = " ".join(str(value).split()).strip()
-        if not cleaned:
-            continue
-        # Keep fields bounded so rendering remains stable.
-        if key == "summary-text":
-            merged[key] = cleaned[:550]
-        elif key.endswith("-title"):
-            merged[key] = cleaned[:90]
-        elif key.endswith("-dates"):
-            merged[key] = cleaned[:100]
-        elif "-bullet-" in key:
-            merged[key] = cleaned[:420]
-        elif key.startswith("skill-"):
-            merged[key] = cleaned[:80]
-        else:
-            merged[key] = cleaned[:420]
-    return merged
-
-
 jd_detector_agent = Agent(
     name="Job Description Detector",
     handoff_description=(
-        "Use this first when the router needs to decide whether the user's latest "
-        "message contains a real job description or job posting for resume tailoring."
+        "Classifies whether the user's latest message contains a real job description "
+        "or job posting for resume tailoring."
     ),
     instructions=f"""
 {RECOMMENDED_PROMPT_PREFIX}
@@ -119,10 +119,54 @@ Return:
 - is_job_description: true only when the message is clearly a job description or posting
 - confidence: 0..1
 - reason: one short sentence
-
-After you are done handoff back to router_agent.
 """,
     output_type=JobDescriptionDecision,
+    model="gpt-5.1",
+)
+
+
+job_skills_agent = Agent(
+    name="Job Skills Agent",
+    handoff_description=(
+        "Analyzes a target job description and existing resume content to recommend "
+        "truthful target skills for the customized resume."
+    ),
+    instructions=f"""
+{RECOMMENDED_PROMPT_PREFIX}
+You are an internal resume-customization specialist.
+
+Given a target job description and the user's existing resume content, identify 8 to 12 target resume skills.
+
+Rules:
+- Use only skills supported by the resume content.
+- Align phrasing with the job description when truthful.
+- Prefer concise skill phrases suitable for skill-1..skill-12 fields.
+- Do not invent tools, certifications, domains, or experience.
+- Return internal guidance only; do not address the user.
+""",
+    model="gpt-5.1",
+)
+
+
+job_experience_agent = Agent(
+    name="Job Experience Rewrite Agent",
+    handoff_description=(
+        "Analyzes a target job description and existing resume bullets to recommend "
+        "truthful experience rewrites for the customized resume."
+    ),
+    instructions=f"""
+{RECOMMENDED_PROMPT_PREFIX}
+You are an internal resume-customization specialist.
+
+Given a target job description and the user's existing resume content, recommend experience bullet rewrites.
+
+Rules:
+- Use only existing resume facts.
+- Preserve truthful company, date, role, tool, metric, and scope boundaries.
+- Key recommendations to existing resume field ids when possible, such as apple-bullet-1.
+- Make bullets more relevant to the job description without overfitting or fabrication.
+- Return internal guidance only; do not address the user.
+""",
     model="gpt-5.1",
 )
 
@@ -135,16 +179,22 @@ resume_customizer_agent = Agent(
     ),
     instructions=f"""
 {RECOMMENDED_PROMPT_PREFIX}
-You customize resume content fields for a target job description.
-Use load_resume_template_data to get users resume.
-After you decide the final updates, call save_custom_resume with the same updates so the UI can render the customized resume.
+You are the workflow manager for full resume customization.
+
+Process:
+1. Use load_resume_template_data to load the user's resume field ids and current content.
+2. Call analyze_job_skills with the job description and resume content to get internal target-skill guidance.
+3. Call analyze_job_experience with the job description and resume content to get internal experience rewrite guidance.
+4. Use both specialist results to produce one final ResumeContentUpdates payload.
+5. Call save_custom_resume with exactly the same updates you return so the UI can render the customized resume.
 
 Hard rules:
-- Use ONLY keys from the 'content' node.
+- Use ONLY keys from the loaded 'content' node.
 - Do not invent experience, metrics, tools, dates, or scope not implied by provided resume content.
-- Keep strong alignment with JD language while remaining truthful.
+- Keep strong alignment with job-description language while remaining truthful.
 - Return only fields that should change as `updates`.
-- If save_custom_resume reports an error, explain the save issue briefly after handing control back.
+- Specialist outputs are internal only; do not expose their detailed analysis to the user.
+- If save_custom_resume reports an error, include a brief save note in `notes`.
 
 Style constraints:
 - summary-text: 1-3 concise sentences.
@@ -152,46 +202,27 @@ Style constraints:
 - *-title fields: short role title.
 - *-dates fields: company + dates formatting, concise and truthful.
 - *-bullet-* fields: concise impact bullets.
-
-After you are done handoff back to router_agent.
 """,
     output_type=AgentOutputSchema(ResumeContentUpdates, strict_json_schema=False),
     model="gpt-5.1",
-    tools=[load_resume_template_data, save_custom_resume]
-)
-
-
-job_skills_agent = Agent(
-    name="Job Skills Agent",
-    handoff_description=(
-        "Use this when the router needs the target role's required skills identified "
-        "and mapped to truthful skills already supported by the resume."
-    ),
-    instructions=f"""
-{RECOMMENDED_PROMPT_PREFIX}
-Extract top required skills from the job description and map them to likely transferable skills.
-Keep the response concise and actionable.
-
-After you are done handoff back to router_agent.
-""",
-    model="gpt-5.1",
-)
-
-
-job_experience_agent = Agent(
-    name="Job Experience Rewrite Agent",
-    handoff_description=(
-        "Use this when the router needs resume experience bullets rewritten for a "
-        "target job while preserving the user's actual scope, tools, and impact."
-    ),
-    instructions=f"""
-{RECOMMENDED_PROMPT_PREFIX}
-Rewrite requested bullets for stronger relevance to a target role.
-Do not fabricate achievements, metrics, tools, or scope.
-
-After you are done handoff back to router_agent.
-""",
-    model="gpt-5.1",
+    tools=[
+        load_resume_template_data,
+        job_skills_agent.as_tool(
+            tool_name="analyze_job_skills",
+            tool_description=(
+                "Analyze the target job description against the loaded resume content "
+                "and return internal guidance for 8 to 12 truthful target skills."
+            ),
+        ),
+        job_experience_agent.as_tool(
+            tool_name="analyze_job_experience",
+            tool_description=(
+                "Analyze the target job description against the loaded resume content "
+                "and return internal guidance for truthful experience bullet rewrites."
+            ),
+        ),
+        save_custom_resume,
+    ],
 )
 
 
@@ -201,20 +232,25 @@ router_agent = Agent(
 You are the conversational assistant for the resume customizer.
 
 Workflow:
-- If the user's message looks like a pasted job description or job posting, hand off directly to resume_customizer_agent. That agent is responsible for producing the final structured resume updates and saving the customized resume for the UI.
-- Use jd_detector_agent only when the message is ambiguous and you need a classification before deciding whether to customize.
-- Use job_skills_agent only when the user specifically asks to analyze or compare skills.
-- Use job_experience_agent only when the user specifically asks to rewrite experience bullets outside the full custom-resume flow.
+- If the user's message clearly looks like a pasted job description or job posting, hand off to resume_customizer_agent.
+- If the message is ambiguous, call classify_job_description first. If it is a job description, hand off to resume_customizer_agent.
+- Use job_skills_agent only when the user specifically asks to analyze or compare skills outside the full custom-resume flow.
+- Use job_experience_agent only when the user specifically asks to rewrite or review experience bullets outside the full custom-resume flow.
+- Do not orchestrate skill mapping and experience rewriting yourself during full customization; resume_customizer_agent manages that internally.
 - After resume_customizer_agent completes successfully, tell the user the customized resume is ready.
 
 If not enough info is provided, ask only for missing essentials.
 """,
     handoff_description="Delegates requests to the right specialist agent",
-    handoffs=[jd_detector_agent, resume_customizer_agent, job_skills_agent, job_experience_agent],
+    tools=[
+        jd_detector_agent.as_tool(
+            tool_name="classify_job_description",
+            tool_description=(
+                "Classify whether the user's latest message is a job description "
+                "or job posting for resume tailoring."
+            ),
+        ),
+    ],
+    handoffs=[resume_customizer_agent, job_skills_agent, job_experience_agent],
     model="gpt-5.1",
 )
-
-jd_detector_agent.handoffs.extend([router_agent])
-resume_customizer_agent.handoffs.extend([router_agent])
-job_skills_agent.handoffs.extend([router_agent])
-job_experience_agent.handoffs.extend([router_agent])

@@ -59,7 +59,55 @@ USA, CA, Cupertino - 165,200.00 - 223,600.00 USD annually USA, NY, BROOKLYN - 15
 
 """
 
+# ai generated
 jd2 = """ 
+Job Title: Data Analyst
+Location: Hybrid – New York, NY
+Employment Type: Full-time
 
+About the Role
+We are seeking a Data Analyst to transform raw data into actionable insights that drive strategic and operational decisions across the business. You will partner closely with product, operations, marketing, and finance stakeholders to deliver dashboards, analyses, and data-driven recommendations.
+
+Responsibilities
+
+Collect, clean, and transform large structured and semi-structured datasets from multiple sources (data warehouse, APIs, CSVs).
+Build, maintain, and optimize SQL queries to support reporting, dashboards, and ad-hoc analysis.
+Develop and own dashboards and reports in BI tools (e.g., Tableau, Power BI, Looker) for key business metrics and KPIs.
+Perform exploratory data analysis (EDA) to identify trends, anomalies, and opportunities for optimization.
+Design and execute A/B tests and experiments; analyze results and communicate recommendations.
+Collaborate with stakeholders to define business questions, translate them into analytical problems, and deliver clear, actionable insights.
+Create clear documentation for datasets, metrics definitions, and analytical methodologies.
+Support data quality initiatives, identifying data issues and partnering with engineering to improve data pipelines.
+Present findings to both technical and non-technical audiences using clear visualizations and narratives.
+Required Qualifications
+
+Bachelor’s degree in a quantitative field (e.g., Statistics, Mathematics, Economics, Computer Science, Engineering, or related).
+2–4+ years of experience as a Data Analyst or in a similar analytical role.
+Strong SQL skills, including complex joins, window functions, and aggregate queries.
+Experience with at least one BI / data visualization tool (e.g., Tableau, Power BI, Looker, Qlik).
+Proficiency in Excel/Google Sheets, including advanced functions (e.g., pivot tables, lookups).
+Hands-on experience with Python or R for data analysis (e.g., pandas, numpy, ggplot2, dplyr).
+Solid understanding of descriptive statistics and basic inferential techniques (hypothesis testing, confidence intervals, correlation/regression).
+Ability to translate ambiguous business questions into structured analytical approaches.
+Strong communication skills and experience presenting findings to stakeholders.
+Preferred Qualifications
+
+Experience working with cloud data warehouses (e.g., Snowflake, BigQuery, Redshift).
+Familiarity with version control (Git) and collaborative analytics workflows.
+Experience with marketing, product, or operations analytics in a SaaS or e-commerce environment.
+Understanding of experimentation design (A/B testing, multivariate testing).
+Knowledge of basic data modeling concepts and ETL/ELT workflows.
+Key Technologies We Use
+
+SQL (Snowflake / BigQuery)
+Tableau and/or Looker
+Python (pandas, numpy, matplotlib/seaborn)
+dbt (nice to have)
+Git / GitHub
+What Success Looks Like in 6–12 Months
+
+You own key dashboards and reporting for your domain with high stakeholder satisfaction.
+You proactively identify trends and opportunities that lead to measurable business impact.
+You are a trusted partner to cross-functional teams, helping them make data-informed decisions.
 
 """
